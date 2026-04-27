@@ -1,0 +1,4 @@
+/target
+/docs
+.claude/
+.DS_Store
