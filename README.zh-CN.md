@@ -9,7 +9,7 @@
 ## 特性
 
 - 🪶 **纯文本输出** —— html2text 干掉 `MsoNormal` 等 CSS；body 字节数 -85%
-- 🔐 **凭据进 Keychain** —— macOS Keychain 一等公民（通过 [`secret`](https://gist.github.com/zhaidewei/secret) 包装），CI / Linux 走 env var
+- 🔐 **凭据进 Keychain** —— 通过 Apple Security framework 直接读 macOS Keychain（不 shell-out、零 runtime 依赖），CI / Linux 走 env var fallback
 - ⚡ **Token 缓存** —— access token 缓存到 `~/Library/Caches/ms365-cli/`，1 小时复用
 - 📦 **3.7 MB 单二进制** —— 同等 Python MCP 要 50+ MB
 - 🎯 **只有 2 个命令** —— `search` 和 `read`，拒绝功能蔓延
@@ -69,13 +69,22 @@ export MS365_USER_EMAIL=you@yourdomain.com
 
 **方式 B —— macOS Keychain（Mac 推荐）：**
 
-需要 [`secret`](https://gist.github.com/zhaidewei/secret) 包装脚本（在 macOS `security` 命令上薄封一层，把所有条目放到 `account=agent-secrets` 的命名空间下）：
+ms365-cli 通过 Apple Security framework 直接读 Keychain，不 shell-out，runtime 没有额外依赖。你只需一次性把 4 个凭据写进 Keychain（`account=agent-secrets`）。
 
+用 macOS 自带的 `security`：
 ```bash
-secret add ms365-prod-client-id     "Entra app client_id"
-secret add ms365-prod-tenant-id     "M365 tenant id"
-secret add ms365-prod-client-secret "Entra app client secret"
-secret add ms365-prod-user-email    "Target mailbox UPN"
+for k in client-id tenant-id client-secret user-email; do
+  read -rs -p "ms365-prod-$k: " v && echo \
+  && security add-generic-password -s "ms365-prod-$k" -a agent-secrets -w "$v"
+done
+```
+
+或者用 [`secret`](https://gist.github.com/zhaidewei/secret) 包装（输入交互更舒服，存储格式相同）：
+```bash
+secret add ms365-prod-client-id
+secret add ms365-prod-tenant-id
+secret add ms365-prod-client-secret
+secret add ms365-prod-user-email
 ```
 
 ### 3. 验证

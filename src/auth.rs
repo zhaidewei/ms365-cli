@@ -1,7 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Constant account namespace used by the `secret` wrapper script
+/// (https://gist.github.com/zhaidewei/secret) — matched here so we read
+/// the same Keychain entries that `secret add` writes.
+#[cfg(target_os = "macos")]
+const KEYCHAIN_ACCOUNT: &str = "agent-secrets";
 
 const TOKEN_ENDPOINT: &str = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token";
 const CACHE_FILE: &str = "ms365-cli/token.json";
@@ -64,20 +69,35 @@ impl Auth {
     }
 }
 
-/// Look up a credential. Tries env var first (portable), then macOS Keychain via `secret` CLI.
+/// Look up a credential. Tries env var first (portable), then macOS Keychain
+/// (account namespace `agent-secrets`, matching the `secret` wrapper script).
 fn lookup(secret_name: &str, env_name: &str) -> Result<String> {
     if let Ok(v) = std::env::var(env_name) {
         if !v.trim().is_empty() {
             return Ok(v.trim().to_string());
         }
     }
-    let out = Command::new("secret").arg("get").arg(secret_name).output();
-    match out {
-        Ok(o) if o.status.success() => Ok(String::from_utf8(o.stdout)?.trim().to_string()),
-        _ => Err(anyhow!(
-            "missing credential — set env var `{env_name}` or run `secret add {secret_name}`"
-        )),
+    if let Some(v) = keychain_lookup(secret_name) {
+        let trimmed = v.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.to_string());
+        }
     }
+    Err(anyhow!(
+        "missing credential — set env var `{env_name}` or store in macOS Keychain \
+         (service `{secret_name}`, account `agent-secrets`)"
+    ))
+}
+
+#[cfg(target_os = "macos")]
+fn keychain_lookup(secret_name: &str) -> Option<String> {
+    let bytes = security_framework::passwords::get_generic_password(secret_name, KEYCHAIN_ACCOUNT).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn keychain_lookup(_secret_name: &str) -> Option<String> {
+    None
 }
 
 fn cache_path() -> Option<std::path::PathBuf> {

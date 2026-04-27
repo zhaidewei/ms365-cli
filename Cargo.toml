@@ -17,6 +17,9 @@ anyhow = "1"
 html2text = "0.12"
 dirs = "5"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3"
+
 [profile.release]
 lto = true
 strip = true

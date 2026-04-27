@@ -9,7 +9,7 @@ Built because Outlook MCP servers transport email bodies as raw HTML (~85% CSS n
 ## Features
 
 - 🪶 **Plain-text output** — html2text strips `MsoNormal` & friends; -85% bytes vs raw HTML body
-- 🔐 **Credentials in keychain** — first-class macOS Keychain support via [`secret`](https://gist.github.com/zhaidewei/secret); env-var fallback for CI/Linux
+- 🔐 **Credentials in keychain** — direct macOS Keychain access via Apple's Security framework (no shell-out, no runtime deps); env-var fallback for CI/Linux
 - ⚡ **Token caching** — access token cached to `~/Library/Caches/ms365-cli/` for 1 hour
 - 📦 **Single 3.7 MB binary** — vs 50+ MB for a Python MCP equivalent
 - 🎯 **Two commands only** — `search` and `read`. No bloat.
@@ -69,13 +69,22 @@ export MS365_USER_EMAIL=you@yourdomain.com
 
 **Method B — macOS Keychain (recommended on Mac):**
 
-Requires the [`secret`](https://gist.github.com/zhaidewei/secret) wrapper script (a thin wrapper around `security` that namespaces entries under `account=agent-secrets`):
+ms365-cli reads Keychain directly via Apple's Security framework — no shell-out, no extra runtime dependency. You only need a one-time setup to populate the 4 entries (under `account=agent-secrets`).
 
+Using built-in `security`:
 ```bash
-secret add ms365-prod-client-id     "Entra app client_id"
-secret add ms365-prod-tenant-id     "M365 tenant id"
-secret add ms365-prod-client-secret "Entra app client secret"
-secret add ms365-prod-user-email    "Target mailbox UPN"
+for k in client-id tenant-id client-secret user-email; do
+  read -rs -p "ms365-prod-$k: " v && echo \
+  && security add-generic-password -s "ms365-prod-$k" -a agent-secrets -w "$v"
+done
+```
+
+Or using the [`secret`](https://gist.github.com/zhaidewei/secret) wrapper (nicer prompt, same storage):
+```bash
+secret add ms365-prod-client-id
+secret add ms365-prod-tenant-id
+secret add ms365-prod-client-secret
+secret add ms365-prod-user-email
 ```
 
 ### 3. Verify
