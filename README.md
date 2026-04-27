@@ -26,7 +26,7 @@ If you need to manage SharePoint sites or Teams policies, use `pnp/cli-microsoft
 ## Features
 
 - 🪶 **Plain-text output** — html2text strips `MsoNormal` & friends; -85% bytes vs raw HTML body
-- 🔐 **Credentials in keychain** — direct macOS Keychain access via Apple's Security framework (no shell-out, no runtime deps); env-var fallback for CI/Linux
+- 🔐 **Credentials in keychain** — silent macOS Keychain access via the Apple-signed `/usr/bin/security` (no Keychain authorization prompts, no extra runtime deps); env-var fallback for CI/Linux
 - ⚡ **Token caching** — access token cached to `~/Library/Caches/molk/` for 1 hour
 - 📦 **Single 3.7 MB binary** — vs 50+ MB for a Python MCP equivalent
 - 🎯 **Two commands only** — `search` and `read`. No bloat.
@@ -86,7 +86,7 @@ export MOLK_USER_EMAIL=you@yourdomain.com
 
 **Method B — macOS Keychain (recommended on Mac):**
 
-`molk` reads Keychain directly via Apple's Security framework — no shell-out, no extra runtime dependency. You only need a one-time setup to populate the 4 entries (under `account=agent-secrets`).
+`molk` reads Keychain by shelling out to the system-built-in, Apple-signed `/usr/bin/security`. This trick gets silent access on every Mac without code-signing `molk` itself or fiddling with partition lists — `/usr/bin/security` is pre-trusted on every Keychain entry's default partition list, so no authorization prompts ever pop up. You only need a one-time setup to populate the 4 entries (under `account=agent-secrets`).
 
 Using built-in `security`:
 ```bash

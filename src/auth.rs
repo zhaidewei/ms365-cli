@@ -2,11 +2,17 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Constant account namespace used by the `secret` wrapper script
-/// (https://gist.github.com/zhaidewei/secret) — matched here so we read
-/// the same Keychain entries that `secret add` writes.
+/// Account namespace for Keychain entries (matches the `secret` wrapper
+/// at https://gist.github.com/zhaidewei/secret so existing `secret add`
+/// entries are read unchanged).
 #[cfg(target_os = "macos")]
 const KEYCHAIN_ACCOUNT: &str = "agent-secrets";
+
+/// Path to the macOS built-in `security` CLI. Hard-coded (vs PATH lookup)
+/// because the silent-Keychain-access trick depends on the caller being
+/// the Apple-signed system binary, not some shadowed wrapper on PATH.
+#[cfg(target_os = "macos")]
+const SECURITY_BIN: &str = "/usr/bin/security";
 
 const TOKEN_ENDPOINT: &str = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token";
 const CACHE_FILE: &str = "molk/token.json";
@@ -89,10 +95,36 @@ fn lookup(secret_name: &str, env_name: &str) -> Result<String> {
     ))
 }
 
+/// Read a Keychain entry by shelling out to Apple's `/usr/bin/security`.
+///
+/// Why shell-out, not the `security-framework` Rust crate? Because Keychain
+/// access control is gated on the *calling binary's code signature*. Apple's
+/// `/usr/bin/security` is system-signed and pre-trusted by every entry's
+/// default partition list, so it reads silently. An unsigned `cargo build`
+/// binary calling the API directly would trigger a Keychain authorization
+/// prompt on every run — bad UX for distribution. Cost: ~50ms per spawn,
+/// hidden behind 1h token cache.
 #[cfg(target_os = "macos")]
 fn keychain_lookup(secret_name: &str) -> Option<String> {
-    let bytes = security_framework::passwords::get_generic_password(secret_name, KEYCHAIN_ACCOUNT).ok()?;
-    String::from_utf8(bytes).ok()
+    let out = std::process::Command::new(SECURITY_BIN)
+        .arg("find-generic-password")
+        .arg("-a")
+        .arg(KEYCHAIN_ACCOUNT)
+        .arg("-s")
+        .arg(secret_name)
+        .arg("-w")
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8(out.stdout).ok()?;
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 #[cfg(not(target_os = "macos"))]

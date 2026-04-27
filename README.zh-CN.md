@@ -26,7 +26,7 @@
 ## 特性
 
 - 🪶 **纯文本输出** —— html2text 干掉 `MsoNormal` 等 CSS；body 字节数 -85%
-- 🔐 **凭据进 Keychain** —— 通过 Apple Security framework 直接读 macOS Keychain（不 shell-out、零 runtime 依赖），CI / Linux 走 env var fallback
+- 🔐 **凭据进 Keychain** —— 通过 macOS 自带、Apple 签名的 `/usr/bin/security` 静默读取（**零 Keychain 授权弹窗**、零额外 runtime 依赖），CI / Linux 走 env var fallback
 - ⚡ **Token 缓存** —— access token 缓存到 `~/Library/Caches/molk/`，1 小时复用
 - 📦 **3.7 MB 单二进制** —— 同等 Python MCP 要 50+ MB
 - 🎯 **只有 2 个命令** —— `search` 和 `read`，拒绝功能蔓延
@@ -86,7 +86,7 @@ export MOLK_USER_EMAIL=you@yourdomain.com
 
 **方式 B —— macOS Keychain（Mac 推荐）：**
 
-`molk` 通过 Apple Security framework 直接读 Keychain，不 shell-out，runtime 没有额外依赖。你只需一次性把 4 个凭据写进 Keychain（`account=agent-secrets`）。
+`molk` 通过 macOS 系统自带、Apple 签名的 `/usr/bin/security` 命令读 Keychain。这个技巧让 `molk` 自身不用 code-sign、也不用改 partition list 就能在任何 Mac 上**静默读取**——因为 `/usr/bin/security` 在 Keychain 条目的默认 partition list 里是预信任的，所以永远不会触发授权弹窗。你只需一次性把 4 个凭据写进 Keychain（`account=agent-secrets`）。
 
 用 macOS 自带的 `security`：
 ```bash
