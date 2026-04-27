@@ -1,5 +1,7 @@
 # ms365-cli
 
+[**English**](README.md) · [中文](README.zh-CN.md)
+
 Token-thrifty Outlook CLI for LLM agents — read your Microsoft 365 mailbox via Graph API without burning context on HTML noise.
 
 Built because Outlook MCP servers transport email bodies as raw HTML (~85% CSS noise from `MsoNormal` classes), which wastes thousands of tokens per email when an LLM agent like Claude Code reads them. `ms365-cli` strips HTML to plain text, trims fields, and skips the schema overhead of an MCP server.
@@ -25,30 +27,63 @@ Requires Rust 1.75+.
 
 ## Setup
 
-1. **Register an Entra (Azure AD) app** in your Microsoft 365 tenant
-   - Single-tenant
-   - Application permissions: `Mail.Read` (and `Mail.Send` if you extend later)
-   - Grant admin consent
-   - Create a client secret
-2. **Provide credentials** — either via env vars or macOS Keychain:
+### 1. Register an Entra (Azure AD) app
 
-   **Env vars (any OS):**
-   ```bash
-   export MS365_CLIENT_ID=...
-   export MS365_TENANT_ID=...
-   export MS365_CLIENT_SECRET=...
-   export MS365_USER_EMAIL=you@yourdomain.com
-   ```
+You need a single-tenant Entra app with Application Permissions on Microsoft Graph. One-time, ~5 minutes.
 
-   **macOS Keychain (recommended on Mac, requires the [`secret`](https://gist.github.com/zhaidewei/secret) wrapper):**
-   ```bash
-   secret add ms365-prod-client-id     "Entra app client_id"
-   secret add ms365-prod-tenant-id     "M365 tenant id"
-   secret add ms365-prod-client-secret "Entra app client secret"
-   secret add ms365-prod-user-email    "Target mailbox UPN"
-   ```
+1. Sign in to [Azure Portal](https://portal.azure.com) → **Microsoft Entra ID** (formerly Azure AD)
+2. Left menu → **App registrations** → **New registration**
+   - **Name**: `ms365-cli` (anything you like)
+   - **Supported account types**: *Accounts in this organizational directory only (Single tenant)*
+   - **Redirect URI**: leave empty (server-to-server flow, no callback)
+   - Click **Register**
+3. On the **Overview** page, copy:
+   - **Application (client) ID** → this is your `MS365_CLIENT_ID`
+   - **Directory (tenant) ID** → this is your `MS365_TENANT_ID`
+4. Left menu → **Certificates & secrets** → **Client secrets** → **+ New client secret**
+   - **Description**: `ms365-cli`
+   - **Expires**: 24 months recommended (rotate before expiry)
+   - Click **Add**
+   - **Copy the *Value* immediately** — once the page refreshes you can no longer see it. → this is your `MS365_CLIENT_SECRET`
+5. Left menu → **API permissions** → **+ Add a permission**
+   - Select **Microsoft Graph** → **Application permissions** (NOT Delegated)
+   - Search and tick `Mail.Read`
+   - (Optional) `Mail.Send` if you extend the CLI later
+   - Click **Add permissions**
+6. **Grant admin consent for [your tenant]** ← required, otherwise API calls return 403
+   - The status column should change to ✅ *Granted for [tenant]*
 
-   `ms365` tries env vars first, then falls back to Keychain.
+> ⚠️ **Application Permissions** mean the app can read **any mailbox in the tenant**. Use this only for tenants you administer; do not share the client secret.
+
+### 2. Provide credentials
+
+Two methods. The CLI tries env vars first, then falls back to macOS Keychain.
+
+**Method A — Environment variables (any OS):**
+```bash
+export MS365_CLIENT_ID=...
+export MS365_TENANT_ID=...
+export MS365_CLIENT_SECRET=...
+export MS365_USER_EMAIL=you@yourdomain.com
+```
+
+**Method B — macOS Keychain (recommended on Mac):**
+
+Requires the [`secret`](https://gist.github.com/zhaidewei/secret) wrapper script (a thin wrapper around `security` that namespaces entries under `account=agent-secrets`):
+
+```bash
+secret add ms365-prod-client-id     "Entra app client_id"
+secret add ms365-prod-tenant-id     "M365 tenant id"
+secret add ms365-prod-client-secret "Entra app client secret"
+secret add ms365-prod-user-email    "Target mailbox UPN"
+```
+
+### 3. Verify
+
+```bash
+ms365 search "test" -n 1
+```
+Should print one NDJSON line. If you get `403`, admin consent (step 6 above) was not granted.
 
 ## Usage
 
