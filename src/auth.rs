@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const KEYCHAIN_ACCOUNT: &str = "agent-secrets";
 
 const TOKEN_ENDPOINT: &str = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token";
-const CACHE_FILE: &str = "ms365-cli/token.json";
+const CACHE_FILE: &str = "molk/token.json";
 
 #[derive(Deserialize)]
 struct TokenResponse {
@@ -30,15 +30,15 @@ pub struct Auth {
 
 impl Auth {
     pub async fn load() -> Result<Self> {
-        let user_email = lookup("ms365-prod-user-email", "MS365_USER_EMAIL")?;
+        let user_email = lookup("molk-prod-user-email", "MOLK_USER_EMAIL")?;
         if let Some(t) = read_cache()? {
             if t.expires_at > now() + 60 {
                 return Ok(Self { user_email, access_token: t.access_token });
             }
         }
-        let tenant = lookup("ms365-prod-tenant-id", "MS365_TENANT_ID")?;
-        let client_id = lookup("ms365-prod-client-id", "MS365_CLIENT_ID")?;
-        let client_secret = lookup("ms365-prod-client-secret", "MS365_CLIENT_SECRET")?;
+        let tenant = lookup("molk-prod-tenant-id", "MOLK_TENANT_ID")?;
+        let client_id = lookup("molk-prod-client-id", "MOLK_CLIENT_ID")?;
+        let client_secret = lookup("molk-prod-client-secret", "MOLK_CLIENT_SECRET")?;
         let url = TOKEN_ENDPOINT.replace("{tenant}", &tenant);
         let resp: TokenResponse = reqwest::Client::new()
             .post(&url)

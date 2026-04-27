@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "ms365", about = "Token-thrifty CLI for Outlook via Microsoft Graph", version)]
+#[command(name = "molk", about = "Token-thrifty Outlook mail CLI for LLM agents (Microsoft Graph)", version)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
